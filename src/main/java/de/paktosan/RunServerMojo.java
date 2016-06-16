@@ -29,33 +29,42 @@ public class RunServerMojo extends AbstractMojo {
      */
     private String version;
     /**
-     * @parameter expression="${basedir}"
-     * @readonly
+     * @parameter default-value="${basedir}"
      */
     private File path;
+    /**
+     * @parameter default-value="-Xmx1g"
+     */
+    private String args;
+    /**
+     * @parameter default-value=" "
+     */
+    private String parameters;
 
     public void execute() throws MojoExecutionException, MojoFailureException {
         ProcessBuilder pb;
         Process p;
-        if (Files.notExists(Paths.get("server"))) {
+        System.out.println("Path is: "+path.toString());
+        if (Files.notExists(Paths.get(path+"/server"))) {
             try {
-                Files.createDirectory(Paths.get("server"));
+                Files.createDirectory(Paths.get(path+"/server"));
             } catch (IOException e) {
                 throw new MojoExecutionException("Could not create directory", e);
             }
         }
-        if (Files.notExists(Paths.get("server/" + version + ".jar"))) {
-            if (Files.notExists(Paths.get("servers"))) {
+        if (Files.notExists(Paths.get(path+"/server/" + version + ".jar"))) {
+            if (Files.notExists(Paths.get(path+"/servers"))) {
                 try {
-                    Files.createDirectory(Paths.get("servers"));
+                    Files.createDirectory(Paths.get(path+"/servers"));
                 } catch (IOException e) {
                     throw new MojoExecutionException("Could not create directory", e);
                 }
             }
-            if (Files.notExists(Paths.get("servers/BuildTools.jar"))) {
+            if (Files.notExists(Paths.get(path+"/servers/BuildTools.jar"))) {
                 getLog().info("Downloading Spigot BuildTools...");
                 try {
-                    FileUtils.copyURLToFile(new URL("https://hub.spigotmc.org/jenkins/job/BuildTools/lastSuccessfulBuild/artifact/target/BuildTools.jar"), new File("servers/BuildTools.jar"));
+                    FileUtils.copyURLToFile(new URL("https://hub.spigotmc.org/jenkins/job/BuildTools/lastSuccessfulBuild/artifact/target/BuildTools.jar"),
+                            new File(path+"/servers/BuildTools.jar"));
                 } catch (IOException e) {
                     throw new MojoExecutionException("Oops", e);
                 }
@@ -86,27 +95,36 @@ public class RunServerMojo extends AbstractMojo {
             }
             getLog().info("Copying everything to server...");
             try {
-                Files.copy(Paths.get("servers/" + version + ".jar"), Paths.get("server/" +
+                Files.copy(Paths.get(path.toString()+"/servers/" + version + ".jar"), Paths.get(path.toString()
+                        +"/server/" +
                         version + ".jar"));
             } catch (IOException e) {
                 throw new MojoExecutionException("Couldn´t copy the server!", e);
             }
         }
-        if (Files.notExists(Paths.get("server/plugins"))) {
+        if (Files.notExists(Paths.get(path.toString()+"/server/plugins"))) {
             try {
-                Files.createDirectory(Paths.get("server/plugins"));
+                Files.createDirectory(Paths.get(path.toString()+"/server/plugins"));
             } catch (IOException e) {
                 throw new MojoExecutionException("Couldn´t create plugin dir" + e);
             }
         }
+        if (Files.exists(Paths.get(path.toString()+"/server/plugins/"+project.getArtifact().getArtifactId()+".jar"))){
+            getLog().info("Deleting old plugin version...");
+            try {
+                Files.delete(Paths.get(path.toString()+"/server/plugins/"+project.getArtifact().getArtifactId()+".jar"));
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
         try {
             Files.copy(Paths.get(String.valueOf(project.getArtifact().getFile())),
-                    Paths.get("server/plugins/" + project.getArtifact().getArtifactId() + ".jar"));
+                    Paths.get(path.toString()+"/server/plugins/" + project.getArtifact().getArtifactId() + ".jar"));
         } catch (IOException e) {
             throw new MojoExecutionException("Couldn´t copy plugin!" + e);
         }
         getLog().info("Starting server...");
-        pb = new ProcessBuilder("java", "-jar", version + ".jar");
+        pb = new ProcessBuilder("java",args, "-jar", version + ".jar", parameters);
         pb.directory(new File(path.toString() + "/server"));
         pb.inheritIO();
         try {
